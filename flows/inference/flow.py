@@ -5,13 +5,16 @@ This flow reads the model from the read_branch (typically main in production).
 It demonstrates the consumer side of the asset lifecycle.
 """
 
-from metaflow import step
+from metaflow import step, pypi
 from obproject import ProjectFlow
+
+SKLEARN_PKGS = {"scikit-learn": "", "numpy": ""}
 
 
 class InferenceFlow(ProjectFlow):
     """Load the production model and run inference."""
 
+    @pypi(packages=SKLEARN_PKGS)
     @step
     def start(self):
         """Load the model asset from the read branch."""
@@ -19,6 +22,7 @@ class InferenceFlow(ProjectFlow):
         print(f"Loaded classifier from branch '{self.prj.branch}'")
         self.next(self.predict)
 
+    @pypi(packages=SKLEARN_PKGS)
     @step
     def predict(self):
         """Run inference on synthetic data."""

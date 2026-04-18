@@ -66,9 +66,12 @@ jobs:
   # On branch delete (without PR): just teardown, no promotion.
 
   promote-and-teardown:
+    # Wait for deploy so promote overwrites the skeleton as `latest`
+    needs: deploy
     if: >
-      (github.event_name == 'delete') ||
-      (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+      always() &&
+      ((github.event_name == 'delete') ||
+      (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true))
     name: Promote & Teardown Branch
     runs-on: ubuntu-latest
     steps:

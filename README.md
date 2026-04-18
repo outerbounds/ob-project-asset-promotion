@@ -2,8 +2,8 @@
 
 Assets in Outerbounds Projects are metadata pointers scoped to git branches.
 The actual data (model weights, datasets) lives in S3. When a feature branch
-is deleted after merge, `teardown-branch` removes the metadata — the S3
-objects survive, but the catalog entries pointing to them are gone.
+is deleted, for example to clean up workflows and app deployments after a feature branch is merged, `outerbounds flowproject teardown-branch` can be used to remove the asset metadata as well. The S3
+objects survive in the same way Metaflow artifacts do if you delete workflows deployments after having already run them, but the catalog entries pointing to them are gone.
 
 `promote_assets()` solves this: it copies asset metadata from one branch to
 another before teardown, so the same underlying weights/data become available

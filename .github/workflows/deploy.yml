@@ -3,6 +3,8 @@ on:
   push:
     branches:
     - main
+    - feature/*
+    - test/*
   pull_request:
     types: [closed]
     branches:
@@ -103,12 +105,13 @@ jobs:
     - name: Promote assets to main
       if: github.event_name == 'pull_request'
       run: |
-        BRANCH=${{ github.head_ref }}
+        SOURCE=${{ github.head_ref }}
+        TARGET=${{ github.event.pull_request.base.ref }}
         PROJECT=$(yq .project obproject.toml)
-        echo "Promoting assets: $PROJECT/$BRANCH -> $PROJECT/main"
+        echo "Promoting assets: $PROJECT/$SOURCE -> $PROJECT/$TARGET"
         python3 -c "
         from obproject.assets import promote_assets
-        result = promote_assets('$PROJECT', source='$BRANCH', target='main')
+        result = promote_assets('$PROJECT', source='$SOURCE', target='$TARGET', with_aliases=True)
         for p in result['promoted']:
             print(f'  Promoted {p[\"kind\"]}/{p[\"name\"]}')
         for e in result['errors']:

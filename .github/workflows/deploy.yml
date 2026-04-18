@@ -1,0 +1,123 @@
+name: Deploy Project
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+    - main
+  delete:
+    branches-ignore: [main]
+
+env:
+  GH_HEAD_REF: ${{ github.head_ref }}
+  GH_REF: ${{ github.ref_name }}
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  deploy:
+    if: github.event_name != 'delete' && !(github.event_name == 'pull_request' && github.event.action == 'closed')
+    name: Deploy Project
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.12
+
+    - name: Install dependencies
+      run: |
+        python3 -m pip install -U requests pyyaml
+        python3 -m pip install outerbounds ob-project-utils --pre
+
+    - name: Configure Outerbounds
+      run: |
+        PROJECT_NAME=$(yq .project obproject.toml)
+        PLATFORM=$(yq .platform obproject.toml)
+        CICD_USER="${PROJECT_NAME//_/-}-cicd"
+        outerbounds service-principal-configure \
+          --name $CICD_USER \
+          --deployment-domain $PLATFORM \
+          --perimeter default \
+          --github-actions
+
+    - name: Deploy Project
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        COMMENTS_URL: ${{ github.event.pull_request.comments_url }}
+        PYTHONUNBUFFERED: 1
+      run: obproject-deploy
+
+  # ── Promote + Teardown ──────────────────────────────────────────────
+  # On PR merge: promote feature branch assets to main, then tear down
+  # the feature branch. This preserves the model weights / data pointers
+  # on main so they survive branch deletion.
+  #
+  # On branch delete (without PR): just teardown, no promotion.
+
+  promote-and-teardown:
+    if: >
+      (github.event_name == 'delete') ||
+      (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+    name: Promote & Teardown Branch
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.12
+
+    - name: Install dependencies
+      run: |
+        python3 -m pip install -U requests pyyaml
+        python3 -m pip install outerbounds ob-project-utils --pre
+
+    - name: Configure Outerbounds
+      run: |
+        PROJECT_NAME=$(yq .project obproject.toml)
+        PLATFORM=$(yq .platform obproject.toml)
+        CICD_USER="${PROJECT_NAME//_/-}-cicd"
+        outerbounds service-principal-configure \
+          --name $CICD_USER \
+          --deployment-domain $PLATFORM \
+          --perimeter default \
+          --github-actions
+
+    - name: Promote assets to main
+      if: github.event_name == 'pull_request'
+      run: |
+        BRANCH=${{ github.head_ref }}
+        PROJECT=$(yq .project obproject.toml)
+        echo "Promoting assets: $PROJECT/$BRANCH -> $PROJECT/main"
+        python3 -c "
+        from obproject.assets import promote_assets
+        result = promote_assets('$PROJECT', source='$BRANCH', target='main')
+        for p in result['promoted']:
+            print(f'  Promoted {p[\"kind\"]}/{p[\"name\"]}')
+        for e in result['errors']:
+            print(f'  Error {e[\"kind\"]}/{e.get(\"name\", \"?\")}: {e[\"error\"]}')
+        if result['errors']:
+            raise SystemExit(1)
+        "
+
+    - name: Teardown branch resources
+      run: |
+        BRANCH=${{ github.head_ref || github.event.ref }}
+        PROJECT=$(yq .project obproject.toml)
+        echo "Tearing down $PROJECT/$BRANCH"
+        outerbounds flowproject teardown-branch \
+          --id "$PROJECT/$BRANCH" --yes -o json

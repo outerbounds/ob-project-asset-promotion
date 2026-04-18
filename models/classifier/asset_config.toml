@@ -1,0 +1,10 @@
+name = "Fraud Classifier"
+id = "classifier"
+description = "Trained fraud detection model (sklearn)"
+
+[properties]
+framework = "sklearn"
+task = "binary_classification"
+
+[tags]
+domain = "fraud"

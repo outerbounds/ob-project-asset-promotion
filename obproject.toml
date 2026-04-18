@@ -1,0 +1,11 @@
+# Asset Promotion Example
+# Demonstrates cross-branch asset promotion on PR merge
+platform = "dev-yellow.outerbounds.xyz"
+
+project = "asset_promotion"
+title = "Asset Promotion Patterns"
+
+[dev-assets]
+# Feature branches read production assets from main while writing to their own branch.
+# This lets you test new training code against real data without polluting production.
+branch = "main"

@@ -1,0 +1,9 @@
+name = "Training Dataset"
+id = "training_data"
+description = "Curated fraud detection training set"
+
+[properties]
+format = "parquet"
+
+[tags]
+domain = "fraud"

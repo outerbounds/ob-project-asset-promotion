@@ -14,8 +14,10 @@ The key question this example addresses:
   See the GitHub Actions workflow and promote_assets.py for the answer.
 """
 
-from metaflow import step, Parameter
+from metaflow import step, pypi, Parameter
 from obproject import ProjectFlow
+
+SKLEARN_PKGS = {"scikit-learn": "", "numpy": ""}
 
 
 class TrainClassifierFlow(ProjectFlow):
@@ -24,6 +26,7 @@ class TrainClassifierFlow(ProjectFlow):
     n_samples = Parameter("n-samples", default=1000, type=int,
                           help="Number of training samples to generate")
 
+    @pypi(packages=SKLEARN_PKGS)
     @step
     def start(self):
         """Generate synthetic training data."""
@@ -51,6 +54,7 @@ class TrainClassifierFlow(ProjectFlow):
 
         self.next(self.train)
 
+    @pypi(packages=SKLEARN_PKGS)
     @step
     def train(self):
         """Train the classifier."""

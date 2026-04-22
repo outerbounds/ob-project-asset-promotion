@@ -33,24 +33,17 @@ jobs:
         fetch-depth: 0
 
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v5
       with:
-        python-version: 3.12
+        python-version: "3.12"
 
     - name: Install dependencies
-      run: |
-        python3 -m pip install -U requests pyyaml
-        python3 -m pip install outerbounds ob-project-utils --pre
+      run: pip install outerbounds ob-project-utils
 
     - name: Configure Outerbounds
       run: |
-        PROJECT_NAME=$(yq .project obproject.toml)
-        PLATFORM=$(yq .platform obproject.toml)
-        CICD_USER="${PROJECT_NAME//_/-}-cicd"
         outerbounds service-principal-configure \
-          --name $CICD_USER \
-          --deployment-domain $PLATFORM \
-          --perimeter default \
+          --from-obproject-toml \
           --github-actions
 
     - name: Deploy Project
@@ -68,7 +61,6 @@ jobs:
   # On branch delete (without PR): just teardown, no promotion.
 
   promote-and-teardown:
-    # Wait for deploy so promote overwrites the skeleton as `latest`
     needs: deploy
     if: >
       always() &&
@@ -82,24 +74,17 @@ jobs:
         fetch-depth: 0
 
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v5
       with:
-        python-version: 3.12
+        python-version: "3.12"
 
     - name: Install dependencies
-      run: |
-        python3 -m pip install -U requests pyyaml
-        python3 -m pip install outerbounds ob-project-utils --pre
+      run: pip install outerbounds ob-project-utils
 
     - name: Configure Outerbounds
       run: |
-        PROJECT_NAME=$(yq .project obproject.toml)
-        PLATFORM=$(yq .platform obproject.toml)
-        CICD_USER="${PROJECT_NAME//_/-}-cicd"
         outerbounds service-principal-configure \
-          --name $CICD_USER \
-          --deployment-domain $PLATFORM \
-          --perimeter default \
+          --from-obproject-toml \
           --github-actions
 
     - name: Promote assets to main
@@ -107,7 +92,13 @@ jobs:
       run: |
         SOURCE=${{ github.head_ref }}
         TARGET=${{ github.event.pull_request.base.ref }}
-        PROJECT=$(yq .project obproject.toml)
+        PROJECT=$(python3 -c "
+        try:
+            import tomllib
+        except ImportError:
+            import toml as tomllib
+        print(tomllib.load(open('obproject.toml','rb'))['project'])
+        ")
         echo "Promoting assets: $PROJECT/$SOURCE -> $PROJECT/$TARGET"
         python3 -c "
         from obproject.assets import promote_assets
@@ -123,7 +114,13 @@ jobs:
     - name: Teardown branch resources
       run: |
         BRANCH=${{ github.head_ref || github.event.ref }}
-        PROJECT=$(yq .project obproject.toml)
+        PROJECT=$(python3 -c "
+        try:
+            import tomllib
+        except ImportError:
+            import toml as tomllib
+        print(tomllib.load(open('obproject.toml','rb'))['project'])
+        ")
         echo "Tearing down $PROJECT/$BRANCH"
         outerbounds flowproject teardown-branch \
           --id "$PROJECT/$BRANCH" --yes -o json
